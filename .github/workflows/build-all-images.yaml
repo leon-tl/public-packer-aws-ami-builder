@@ -1,0 +1,37 @@
+---
+name: Build all AMIs
+on:
+  workflow_dispatch:
+
+# required for GitHub OIDC - https://github.com/aws-actions/configure-aws-credentials
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    name: Deploy Resources
+    runs-on: ubuntu-latest
+    steps:
+      - name: Allow Workflow access to repo
+        uses: actions/checkout@v4
+
+      - name: Assume IAM Role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ vars.IAM_ROLE }}
+          role-session-name: GitHubActions
+
+      - name: Retrieve credentials
+        run: aws sts get-caller-identity
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@v2
+
+      - name: Build packer images
+        run: |
+          packer build packer/amazon-linux-2023/
+          packer build packer/rhel-9/
+          packer build packer/windows-2022-server/
+          packer build packer/windows-2025-server/

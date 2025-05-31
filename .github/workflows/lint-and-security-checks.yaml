@@ -1,0 +1,69 @@
+---
+name: Lint and Security Checks
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: Run Linting and Security Tools
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install ShellCheck
+        run: sudo apt install shellcheck -y
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@v2
+
+      - name: Init Packer
+        run: |
+          packer init packer/
+
+      - name: Build packer image
+        run: |
+          packer validate packer/amazon-linux-2023/
+          packer validate packer/rhel-9/
+          packer validate packer/windows-2022-server/
+          packer validate packer/windows-2025-server/
+
+      - name: Format Check
+        run: |
+          packer fmt -check packer/amazon-linux-2023/
+          packer fmt -check packer/rhel-9/
+          packer fmt -check packer/windows-2022-server/
+          packer fmt -check packer/windows-2025-server/
+
+      - name: Run Checkov Scan
+        run: |
+          checkov -d packer/amazon-linux-2023/
+          checkov -d packer/rhel-9/
+          checkov -d packer/windows-2022-server/
+          checkov -d packer/windows-2025-server/
+
+      - name: ShellCheck Scripts
+        run: |
+          shellcheck packer/**/scripts/*.sh
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module -Name PSScriptAnalyzer -Force
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Invoke-ScriptAnalyzer -Path packer/**/scripts -Recurse -ErrorAction Stop
